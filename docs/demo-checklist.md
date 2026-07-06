@@ -42,6 +42,7 @@ X-CodePilot-Api-Key: your-secret-key
 uv run ruff check .
 uv run pyright
 uv run pytest
+docker compose config --quiet
 ```
 
 ## 启动方式
