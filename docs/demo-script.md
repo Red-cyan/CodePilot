@@ -135,6 +135,13 @@ PR Review 示例：
 }
 ```
 
+演示重点：
+
+- 返回 `score`，可以快速判断变更风险。
+- 返回 `issues`，每个问题包含 category、severity、message、suggestion 和 line_hint。
+- `content` 字段仍保留 DeepSeek 生成的中文 Review 总结。
+- 这个设计体现了“确定性规则 + LLM 解释”的组合，而不是完全依赖大模型。
+
 ## 7. 生成类 Agent
 
 调用 `POST /generate/readme` 生成 README 草稿。
