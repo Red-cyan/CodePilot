@@ -6,6 +6,8 @@ from app.schemas import (
     BugAnalysisRequest,
     ChatRequest,
     ChatResponse,
+    FileContentResponse,
+    FileTreeResponse,
     ImportRepositoryRequest,
     ImportRepositoryResponse,
     IndexRepositoryResponse,
@@ -14,9 +16,11 @@ from app.schemas import (
     ReviewRequest,
     RunListResponse,
     RunRecord,
+    SymbolListResponse,
     UnitTestGenerationRequest,
 )
 from app.services.analysis import AnalysisService
+from app.services.browser import BrowserService
 from app.services.generation import GenerationService
 from app.services.indexer import IndexerService
 from app.services.repository import RepositoryService
@@ -26,6 +30,7 @@ from app.services.run_store import RunStore
 router = APIRouter()
 repository_service = RepositoryService()
 indexer_service = IndexerService(repository_service)
+browser_service = BrowserService(repository_service)
 run_store = RunStore()
 analysis_service = AnalysisService(repository_service, run_store=run_store)
 review_service = ReviewService(repository_service, run_store=run_store)
@@ -55,6 +60,46 @@ def index_repository(repository_id: str) -> IndexRepositoryResponse:
 @router.get("/repositories", tags=["repositories"])
 def list_repositories() -> list[dict[str, object]]:
     return [repo.model_dump() for repo in repository_service.list_repositories()]
+
+
+@router.get(
+    "/repositories/{repository_id}/tree",
+    response_model=FileTreeResponse,
+    tags=["repositories"],
+)
+def get_repository_tree(repository_id: str) -> FileTreeResponse:
+    try:
+        return browser_service.tree(repository_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get(
+    "/repositories/{repository_id}/files",
+    response_model=FileContentResponse,
+    tags=["repositories"],
+)
+def get_repository_file(repository_id: str, path: str) -> FileContentResponse:
+    try:
+        return browser_service.file(repository_id, path)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/repositories/{repository_id}/symbols",
+    response_model=SymbolListResponse,
+    tags=["repositories"],
+)
+def get_repository_symbols(repository_id: str) -> SymbolListResponse:
+    try:
+        return browser_service.symbols(repository_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/runs", response_model=RunListResponse, tags=["runs"])

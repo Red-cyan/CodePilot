@@ -25,6 +25,39 @@ class RepositorySummary(BaseModel):
     languages: dict[str, int] = Field(default_factory=dict)
 
 
+class FileTreeItem(BaseModel):
+    path: str
+    name: str
+    type: str
+    language: str | None = None
+    size: int | None = None
+
+
+class FileTreeResponse(BaseModel):
+    repository_id: str
+    items: list[FileTreeItem]
+
+
+class FileContentResponse(BaseModel):
+    repository_id: str
+    path: str
+    language: str | None = None
+    content: str
+    size: int
+
+
+class SymbolResponse(BaseModel):
+    name: str
+    kind: str
+    path: str
+    line: int
+
+
+class SymbolListResponse(BaseModel):
+    repository_id: str
+    symbols: list[SymbolResponse]
+
+
 class ImportRepositoryResponse(BaseModel):
     repository: RepositorySummary
 

@@ -38,6 +38,47 @@ def test_import_index_and_chat(tmp_path):
     assert chat.json()["citations"][0]["path"] == "app.py"
 
 
+def test_repository_browser_endpoints(tmp_path):
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "service.py").write_text(
+        "class Service:\n    def run(self):\n        return 'ok'\n",
+        encoding="utf-8",
+    )
+    client = TestClient(create_app())
+
+    imported = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+    )
+    repository_id = imported.json()["repository"]["id"]
+    client.post(f"/repositories/{repository_id}/index")
+
+    tree = client.get(f"/repositories/{repository_id}/tree")
+    assert tree.status_code == 200
+    tree_paths = {item["path"] for item in tree.json()["items"]}
+    assert "pkg" in tree_paths
+    assert "pkg/service.py" in tree_paths
+
+    file_response = client.get(
+        f"/repositories/{repository_id}/files",
+        params={"path": "pkg/service.py"},
+    )
+    assert file_response.status_code == 200
+    assert file_response.json()["language"] == "python"
+    assert "class Service" in file_response.json()["content"]
+
+    symbols = client.get(f"/repositories/{repository_id}/symbols")
+    assert symbols.status_code == 200
+    symbol_names = {symbol["name"] for symbol in symbols.json()["symbols"]}
+    assert {"Service", "run"} <= symbol_names
+
+    unsafe = client.get(
+        f"/repositories/{repository_id}/files",
+        params={"path": "../outside.py"},
+    )
+    assert unsafe.status_code == 400
+
+
 def test_generation_endpoints(tmp_path):
     (tmp_path / "service.py").write_text(
         "def create_order(user_id: str):\n    return {'user_id': user_id}\n",
