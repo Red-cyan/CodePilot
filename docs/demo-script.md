@@ -52,6 +52,47 @@ http://127.0.0.1:8000/docs
 
 ## 5. 仓库问答
 
+先调用 `POST /search/code` 演示多模式代码检索：
+
+语义检索：
+
+```json
+{
+  "repository_id": "<id>",
+  "query": "repository import workflow",
+  "mode": "semantic",
+  "top_k": 5
+}
+```
+
+关键词检索：
+
+```json
+{
+  "repository_id": "<id>",
+  "query": "RepositoryService",
+  "mode": "keyword",
+  "top_k": 5
+}
+```
+
+符号检索：
+
+```json
+{
+  "repository_id": "<id>",
+  "query": "RepositoryService",
+  "mode": "symbol",
+  "top_k": 5
+}
+```
+
+演示重点：
+
+- semantic 展示 RAG 的召回基础。
+- keyword 展示确定性文本匹配。
+- symbol 展示代码解析结果可以直接服务于检索。
+
 调用 `POST /chat`：
 
 ```json
@@ -134,5 +175,5 @@ PR Review 示例：
 ## 9. 面试讲解重点
 
 - CodePilot 不是普通聊天机器人，而是围绕代码仓库理解设计的工程 Agent。
-- 当前闭环包括导入、解析、源码浏览、索引、检索、LLM 生成、运行历史、引用追踪和测试验证。
+- 当前闭环包括导入、解析、源码浏览、多模式检索、索引、LLM 生成、运行历史、引用追踪和测试验证。
 - 测试环境禁用真实模型调用，保证 CI 稳定；本地 `.env` 配置 API Key 后可调用真实 DeepSeek。
