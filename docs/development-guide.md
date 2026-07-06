@@ -37,6 +37,16 @@ docker compose config --quiet
 git diff --check
 ```
 
+## GitHub 协作
+
+仓库提供了 GitHub 模板：
+
+- `.github/pull_request_template.md`：用于说明变更类型、验证结果、演示影响和安全检查。
+- `.github/ISSUE_TEMPLATE/bug_report.md`：用于记录可复现 Bug。
+- `.github/ISSUE_TEMPLATE/task.md`：用于记录文档、测试、工程配置等小范围质量改进。
+
+提交 PR 前需要明确本次改动是否影响演示流程。如果影响接口、启动方式或鉴权方式，必须同步更新 README 或 `docs/`。
+
 ## 密钥处理
 
 - `.env.example` 只保留空值或示例值。
