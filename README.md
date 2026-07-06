@@ -57,6 +57,7 @@ uv run uvicorn app.main:app --reload
 DEEPSEEK_API_KEY=你的 API Key
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-chat
+CODEPILOT_API_KEY=
 CODEPILOT_MAX_INDEX_FILE_SIZE=512000
 CODEPILOT_IGNORED_DIRS=.git,.idea,.venv,__pycache__,node_modules,dist,build,target,.pytest_cache,.ruff_cache
 ```
@@ -86,6 +87,24 @@ API 容器会把运行状态保存到 Docker volume `api_storage`，不会写入
 
 - `X-Request-Id`：请求追踪 ID；如果客户端传入同名请求头，服务会原样透传。
 - `X-Process-Time-Ms`：本次请求处理耗时，单位毫秒。
+
+### API Key 鉴权
+
+默认情况下 `CODEPILOT_API_KEY` 为空，所有接口都可以直接用于本地演示。
+
+如果在 `.env` 中配置：
+
+```env
+CODEPILOT_API_KEY=your-secret-key
+```
+
+仓库导入、索引、重新索引、删除、代码检索、Chat、分析、Review 和生成类接口需要在请求头中携带：
+
+```text
+X-CodePilot-Api-Key: your-secret-key
+```
+
+健康检查、系统诊断、仓库列表、源码浏览、符号查看和运行历史查询保持公开，便于演示和排查。
 
 ## 主要 API
 

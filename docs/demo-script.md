@@ -23,6 +23,14 @@ docker compose up --build
 http://127.0.0.1:8000/docs
 ```
 
+如果 `.env` 中配置了 `CODEPILOT_API_KEY`，演示写操作和 Agent 接口时需要增加请求头：
+
+```text
+X-CodePilot-Api-Key: your-secret-key
+```
+
+未配置 `CODEPILOT_API_KEY` 时无需鉴权，适合本地快速演示。
+
 演示重点：
 
 - Docker Compose 会启动 API、PostgreSQL/pgvector 和 Redis。
