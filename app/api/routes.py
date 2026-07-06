@@ -16,6 +16,7 @@ from app.schemas import (
     ReadmeRequest,
     ReportResponse,
     ReviewRequest,
+    ReviewResponse,
     RunListResponse,
     RunRecord,
     SymbolListResponse,
@@ -151,8 +152,8 @@ def analyze_bug(payload: BugAnalysisRequest) -> ReportResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/review", response_model=ReportResponse, tags=["agents"])
-def review(payload: ReviewRequest) -> ReportResponse:
+@router.post("/review", response_model=ReviewResponse, tags=["agents"])
+def review(payload: ReviewRequest) -> ReviewResponse:
     try:
         return review_service.review(payload)
     except KeyError as exc:

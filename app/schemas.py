@@ -89,6 +89,24 @@ class ReviewRequest(BaseModel):
     diff: str
 
 
+class ReviewIssue(BaseModel):
+    category: str
+    severity: str
+    message: str
+    suggestion: str
+    line_hint: str | None = None
+
+
+class ReviewResponse(BaseModel):
+    repository_id: str
+    title: str
+    content: str
+    score: int
+    summary: str
+    issues: list[ReviewIssue] = Field(default_factory=list)
+    citations: list["Citation"] = Field(default_factory=list)
+
+
 class ReadmeRequest(BaseModel):
     repository_id: str
 

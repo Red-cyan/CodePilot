@@ -1,4 +1,4 @@
-from app.schemas import ReportResponse, ReviewRequest
+from app.schemas import ReviewIssue, ReviewRequest, ReviewResponse
 from app.services.llm import ChatMessage, LLMClient, default_llm_client
 from app.services.repository import RepositoryService
 from app.services.retriever import CodeRetriever, citation_from_chunk
@@ -17,7 +17,7 @@ class ReviewService:
         self._llm = llm_client or default_llm_client()
         self._run_store = run_store
 
-    def review(self, payload: ReviewRequest) -> ReportResponse:
+    def review(self, payload: ReviewRequest) -> ReviewResponse:
         timer = RunTimer()
         repository = self._repository_service.get(payload.repository_id)
         changed_terms = " ".join(
@@ -27,7 +27,10 @@ class ReviewService:
         )
         results = self._retriever.search(repository, changed_terms or payload.diff, top_k=5)
         citations = [citation_from_chunk(chunk, score) for chunk, score in results]
-        findings = self._findings(payload.diff)
+        issues = self._issues(payload.diff)
+        findings = self._format_issues(issues)
+        score = self._score(issues)
+        summary = self._summary(score, issues)
         content = self._llm.complete(
             [
                 ChatMessage(
@@ -44,16 +47,19 @@ class ReviewService:
                         f"仓库：{repository.name}\n\n"
                         f"git diff：\n{payload.diff}\n\n"
                         f"确定性检查：\n{findings}\n\n"
-                        f"初始评分：{self._score(payload.diff)}/100\n\n"
+                        f"初始评分：{score}/100\n\n"
                         f"相关代码：\n{self._format_citations(citations)}"
                     ),
                 ),
             ]
         )
-        response = ReportResponse(
+        response = ReviewResponse(
             repository_id=repository.id,
             title="Pull Request Review",
             content=content,
+            score=score,
+            summary=summary,
+            issues=issues,
             citations=citations,
         )
         if self._run_store is not None:
@@ -69,35 +75,97 @@ class ReviewService:
         return response
 
     @staticmethod
-    def _findings(diff: str) -> str:
-        findings: list[str] = []
+    def _issues(diff: str) -> list[ReviewIssue]:
+        issues: list[ReviewIssue] = []
         if "password" in diff.lower() or "secret" in diff.lower():
-            findings.append(
-                "- Security: diff contains credential-like words; verify no secrets are committed."
+            issues.append(
+                ReviewIssue(
+                    category="security",
+                    severity="high",
+                    message="diff 中出现疑似凭据字段。",
+                    suggestion="确认没有提交真实密钥、密码或 token，并改用环境变量或密钥管理服务。",
+                    line_hint="password/secret",
+                )
             )
         if "except Exception" in diff:
-            findings.append(
-                "- Maintainability: broad exception handling may hide actionable failures."
+            issues.append(
+                ReviewIssue(
+                    category="maintainability",
+                    severity="medium",
+                    message="新增代码包含过宽的异常捕获。",
+                    suggestion="捕获更具体的异常类型，并记录可定位的错误上下文。",
+                    line_hint="except Exception",
+                )
             )
         if "TODO" in diff or "FIXME" in diff:
-            findings.append(
-                "- Maintainability: unresolved TODO/FIXME comments should be tracked or resolved."
+            issues.append(
+                ReviewIssue(
+                    category="maintainability",
+                    severity="low",
+                    message="diff 中包含未解决的 TODO/FIXME。",
+                    suggestion="在合并前解决该事项，或关联明确的 issue/task 编号。",
+                    line_hint="TODO/FIXME",
+                )
             )
         if "print(" in diff:
-            findings.append("- Style: replace debug prints with structured logging.")
-        return (
-            "\n".join(findings)
-            if findings
-            else "- No deterministic issues detected in the diff."
+            issues.append(
+                ReviewIssue(
+                    category="style",
+                    severity="low",
+                    message="新增代码包含 print 调试输出。",
+                    suggestion="替换为结构化日志，或在提交前删除调试输出。",
+                    line_hint="print(",
+                )
+            )
+        added_lines = [
+            line
+            for line in diff.splitlines()
+            if line.startswith("+") and not line.startswith("+++")
+        ]
+        test_lines = [
+            line for line in added_lines if "test" in line.lower() or "assert" in line.lower()
+        ]
+        if len(added_lines) >= 5 and not test_lines:
+            issues.append(
+                ReviewIssue(
+                    category="test",
+                    severity="medium",
+                    message="diff 新增了多行实现代码，但没有明显测试变更。",
+                    suggestion="补充单元测试或接口测试，覆盖主要成功路径和失败路径。",
+                    line_hint="新增代码缺少测试",
+                )
+            )
+        return issues
+
+    @staticmethod
+    def _format_issues(issues: list[ReviewIssue]) -> str:
+        if not issues:
+            return "- 未发现确定性规则问题。"
+        return "\n".join(
+            f"- {issue.severity.upper()} / {issue.category}: "
+            f"{issue.message} 建议：{issue.suggestion}"
+            for issue in issues
         )
 
     @staticmethod
-    def _score(diff: str) -> int:
+    def _score(issues: list[ReviewIssue]) -> int:
         score = 90
-        for marker in ("password", "secret", "except Exception", "TODO", "FIXME", "print("):
-            if marker.lower() in diff.lower():
-                score -= 8
+        penalty_by_severity = {"high": 18, "medium": 10, "low": 5}
+        for issue in issues:
+            score -= penalty_by_severity.get(issue.severity, 6)
         return max(score, 50)
+
+    @staticmethod
+    def _summary(score: int, issues: list[ReviewIssue]) -> str:
+        if not issues:
+            return "未发现确定性规则问题，建议继续结合业务语义和测试结果人工确认。"
+        high_count = sum(1 for issue in issues if issue.severity == "high")
+        medium_count = sum(1 for issue in issues if issue.severity == "medium")
+        low_count = sum(1 for issue in issues if issue.severity == "low")
+        return (
+            f"评分 {score}/100；发现 {len(issues)} 个确定性问题，"
+            f"其中 high={high_count}，medium={medium_count}，low={low_count}。"
+        )
 
     @staticmethod
     def _format_citations(citations: list) -> str:  # noqa: ANN401
