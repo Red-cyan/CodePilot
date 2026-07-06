@@ -1,0 +1,15 @@
+.git
+.idea
+.venv
+__pycache__
+.pytest_cache
+.ruff_cache
+.pyright
+.env
+.env.*
+storage
+tmp
+dist
+build
+node_modules
+*.egg-info

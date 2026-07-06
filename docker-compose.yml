@@ -1,4 +1,27 @@
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: codepilot-api
+    environment:
+      CODEPILOT_ENV: docker
+      CODEPILOT_STORAGE_DIR: /app/storage
+      CODEPILOT_MAX_INDEX_FILE_SIZE: ${CODEPILOT_MAX_INDEX_FILE_SIZE:-512000}
+      CODEPILOT_IGNORED_DIRS: ${CODEPILOT_IGNORED_DIRS:-.git,.idea,.venv,__pycache__,node_modules,dist,build,target,.pytest_cache,.ruff_cache}
+      CODEPILOT_DATABASE_URL: postgresql+psycopg://codepilot:codepilot@postgres:5432/codepilot
+      CODEPILOT_REDIS_URL: redis://redis:6379/0
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+    ports:
+      - "8000:8000"
+    volumes:
+      - api_storage:/app/storage
+    depends_on:
+      - postgres
+      - redis
+
   postgres:
     image: pgvector/pgvector:pg16
     container_name: codepilot-postgres
@@ -18,4 +41,5 @@ services:
       - "6379:6379"
 
 volumes:
+  api_storage:
   postgres_data:
