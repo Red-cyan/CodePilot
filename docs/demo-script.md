@@ -27,6 +27,7 @@ http://127.0.0.1:8000/docs
 
 - Docker Compose 会启动 API、PostgreSQL/pgvector 和 Redis。
 - API 容器使用 Docker volume 保存 `storage` 状态，不会污染仓库目录。
+- 任意 API 响应都会返回 `X-Request-Id` 和 `X-Process-Time-Ms`，可以说明请求追踪和接口耗时。
 
 ## 2. 导入仓库
 
