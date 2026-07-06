@@ -2,6 +2,7 @@ from app.schemas import ReportResponse, ReviewRequest
 from app.services.llm import ChatMessage, LLMClient, default_llm_client
 from app.services.repository import RepositoryService
 from app.services.retriever import CodeRetriever, citation_from_chunk
+from app.services.run_store import RunStore, RunTimer
 
 
 class ReviewService:
@@ -9,12 +10,15 @@ class ReviewService:
         self,
         repository_service: RepositoryService,
         llm_client: LLMClient | None = None,
+        run_store: RunStore | None = None,
     ) -> None:
         self._repository_service = repository_service
         self._retriever = CodeRetriever()
         self._llm = llm_client or default_llm_client()
+        self._run_store = run_store
 
     def review(self, payload: ReviewRequest) -> ReportResponse:
+        timer = RunTimer()
         repository = self._repository_service.get(payload.repository_id)
         changed_terms = " ".join(
             line[1:].strip()
@@ -46,12 +50,23 @@ class ReviewService:
                 ),
             ]
         )
-        return ReportResponse(
+        response = ReportResponse(
             repository_id=repository.id,
             title="Pull Request Review",
             content=content,
             citations=citations,
         )
+        if self._run_store is not None:
+            self._run_store.record(
+                repository_id=response.repository_id,
+                kind="pr_review",
+                title=response.title,
+                content=response.content,
+                citations=response.citations,
+                tool_trace=["diff_parser", "retriever", "llm"],
+                duration_ms=timer.elapsed_ms(),
+            )
+        return response
 
     @staticmethod
     def _findings(diff: str) -> str:

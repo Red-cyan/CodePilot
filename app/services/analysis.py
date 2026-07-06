@@ -1,10 +1,11 @@
 import re
 from collections import Counter
 
-from app.schemas import BugAnalysisRequest, ChatRequest, ReportResponse
+from app.schemas import BugAnalysisRequest, ChatRequest, ChatResponse, ReportResponse
 from app.services.llm import ChatMessage, LLMClient, default_llm_client
 from app.services.repository import RepositoryService
 from app.services.retriever import CodeRetriever, citation_from_chunk
+from app.services.run_store import RunStore, RunTimer
 
 
 class AnalysisService:
@@ -12,15 +13,21 @@ class AnalysisService:
         self,
         repository_service: RepositoryService,
         llm_client: LLMClient | None = None,
+        run_store: RunStore | None = None,
     ) -> None:
         self._repository_service = repository_service
         self._retriever = CodeRetriever()
         self._llm = llm_client or default_llm_client()
+        self._run_store = run_store
 
-    def chat(self, payload: ChatRequest) -> dict[str, object]:
+    def chat(self, payload: ChatRequest) -> ChatResponse:
+        timer = RunTimer()
         repository = self._repository_service.get(payload.repository_id)
         results = self._retriever.search(repository, payload.question, payload.top_k)
-        citations = [citation_from_chunk(chunk, score).model_dump() for chunk, score in results]
+        citations = [citation_from_chunk(chunk, score) for chunk, score in results]
+        citation_context = self._format_citations(
+            [citation.model_dump() for citation in citations]
+        )
         answer = self._llm.complete(
             [
                 ChatMessage(
@@ -36,18 +43,30 @@ class AnalysisService:
                     content=(
                         f"用户问题：{payload.question}\n\n"
                         f"仓库名称：{repository.name}\n\n"
-                        f"检索上下文：\n{self._format_citations(citations)}"
+                        f"检索上下文：\n{citation_context}"
                     ),
                 ),
             ]
         )
-        return {
-            "answer": answer,
-            "citations": citations,
-            "tool_trace": ["retriever", "context_builder", "llm"],
-        }
+        response = ChatResponse(
+            repository_id=repository.id,
+            answer=answer,
+            citations=citations,
+            tool_trace=["retriever", "context_builder", "llm"],
+        )
+        self._record_run(
+            repository_id=repository.id,
+            kind="chat",
+            title=f"Chat: {payload.question[:80]}",
+            content=answer,
+            citations=citations,
+            tool_trace=response.tool_trace,
+            duration_ms=timer.elapsed_ms(),
+        )
+        return response
 
     def architecture(self, repository_id: str) -> ReportResponse:
+        timer = RunTimer()
         repository = self._repository_service.get(repository_id)
         path_counter = Counter(chunk.path.split("/")[0] for chunk in repository.chunks)
         language_lines = "\n".join(
@@ -86,14 +105,17 @@ class AnalysisService:
                 ),
             ]
         )
-        return ReportResponse(
+        response = ReportResponse(
             repository_id=repository.id,
             title=f"Architecture Report: {repository.name}",
             content=content,
             citations=citations,
         )
+        self._record_report("architecture", response, timer.elapsed_ms())
+        return response
 
     def bug(self, payload: BugAnalysisRequest) -> ReportResponse:
+        timer = RunTimer()
         repository = self._repository_service.get(payload.repository_id)
         query = self._bug_query(payload.error_log)
         results = self._retriever.search(repository, query, top_k=6)
@@ -122,12 +144,14 @@ class AnalysisService:
                 ),
             ]
         )
-        return ReportResponse(
+        response = ReportResponse(
             repository_id=repository.id,
             title="Bug Analysis",
             content=content,
             citations=citations,
         )
+        self._record_report("bug_analysis", response, timer.elapsed_ms())
+        return response
 
     @staticmethod
     def _bug_query(error_log: str) -> str:
@@ -148,3 +172,37 @@ class AnalysisService:
                 f"代码片段：\n{citation['preview']}"
             )
         return "\n\n---\n\n".join(blocks)
+
+    def _record_report(self, kind: str, response: ReportResponse, duration_ms: int) -> None:
+        self._record_run(
+            repository_id=response.repository_id,
+            kind=kind,
+            title=response.title,
+            content=response.content,
+            citations=response.citations,
+            tool_trace=["retriever", "context_builder", "llm"],
+            duration_ms=duration_ms,
+        )
+
+    def _record_run(
+        self,
+        *,
+        repository_id: str,
+        kind: str,
+        title: str,
+        content: str,
+        citations: list,
+        tool_trace: list[str],
+        duration_ms: int,
+    ) -> None:
+        if self._run_store is None:
+            return
+        self._run_store.record(
+            repository_id=repository_id,
+            kind=kind,
+            title=title,
+            content=content,
+            citations=citations,
+            tool_trace=tool_trace,
+            duration_ms=duration_ms,
+        )

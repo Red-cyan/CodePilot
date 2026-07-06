@@ -88,3 +88,26 @@ class ReportResponse(BaseModel):
     title: str
     content: str
     citations: list[Citation] = Field(default_factory=list)
+
+
+class ChatResponse(BaseModel):
+    repository_id: str
+    answer: str
+    citations: list[Citation] = Field(default_factory=list)
+    tool_trace: list[str] = Field(default_factory=list)
+
+
+class RunRecord(BaseModel):
+    id: str
+    repository_id: str
+    kind: str
+    title: str
+    content: str
+    citations: list[Citation] = Field(default_factory=list)
+    tool_trace: list[str] = Field(default_factory=list)
+    duration_ms: int
+    created_at: str
+
+
+class RunListResponse(BaseModel):
+    runs: list[RunRecord]

@@ -75,3 +75,35 @@ def test_generation_endpoints(tmp_path):
     assert test_response.status_code == 200
     assert test_response.json()["title"] == "Unit Test Generation Draft"
     assert test_response.json()["citations"][0]["path"] == "service.py"
+
+
+def test_agent_runs_are_recorded(tmp_path):
+    (tmp_path / "app.py").write_text(
+        "def import_repository(source: str):\n    return source\n",
+        encoding="utf-8",
+    )
+    client = TestClient(create_app())
+
+    imported = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+    )
+    repository_id = imported.json()["repository"]["id"]
+    client.post(f"/repositories/{repository_id}/index")
+
+    chat = client.post(
+        "/chat",
+        json={"repository_id": repository_id, "question": "import repository"},
+    )
+    assert chat.status_code == 200
+
+    runs = client.get(f"/runs?repository_id={repository_id}")
+    assert runs.status_code == 200
+    run = runs.json()["runs"][0]
+    assert run["kind"] == "chat"
+    assert run["repository_id"] == repository_id
+    assert run["tool_trace"] == ["retriever", "context_builder", "llm"]
+
+    detail = client.get(f"/runs/{run['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["content"] == chat.json()["answer"]

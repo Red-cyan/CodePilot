@@ -107,6 +107,21 @@ PR Review 示例：
 
 ## 7. 面试讲解重点
 
+## 7. 查看运行历史
+
+调用 `GET /runs?repository_id=<id>` 查看当前仓库的 Agent 调用历史。
+
+调用 `GET /runs/{run_id}` 查看单次调用详情。
+
+演示重点：
+
+- 每条记录包含 `kind`，能区分 chat、architecture、bug_analysis、pr_review、readme_generation 等任务。
+- 每条记录包含 `tool_trace`，可以说明本次调用经过了 retriever、context_builder、llm 等步骤。
+- 每条记录保留 citations，能展示回答依据来自哪些文件和行号。
+- 每条记录包含 `duration_ms`，可以体现基本可观测性。
+
+## 8. 面试讲解重点
+
 - CodePilot 不是普通聊天机器人，而是围绕代码仓库理解设计的工程 Agent。
-- 当前闭环包括导入、解析、索引、检索、LLM 生成、引用追踪和测试验证。
+- 当前闭环包括导入、解析、索引、检索、LLM 生成、运行历史、引用追踪和测试验证。
 - 测试环境禁用真实模型调用，保证 CI 稳定；本地 `.env` 配置 API Key 后可调用真实 DeepSeek。

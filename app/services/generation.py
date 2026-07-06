@@ -4,6 +4,7 @@ from app.schemas import ApiGenerationRequest, ReportResponse, UnitTestGeneration
 from app.services.llm import ChatMessage, LLMClient, default_llm_client
 from app.services.repository import RepositoryService
 from app.services.retriever import CodeRetriever, citation_from_chunk
+from app.services.run_store import RunStore, RunTimer
 
 
 class GenerationService:
@@ -11,12 +12,15 @@ class GenerationService:
         self,
         repository_service: RepositoryService,
         llm_client: LLMClient | None = None,
+        run_store: RunStore | None = None,
     ) -> None:
         self._repository_service = repository_service
         self._llm = llm_client or default_llm_client()
         self._retriever = CodeRetriever()
+        self._run_store = run_store
 
     def readme(self, repository_id: str) -> ReportResponse:
+        timer = RunTimer()
         repository = self._repository_service.get(repository_id)
         modules = Counter(chunk.path.split("/")[0] for chunk in repository.chunks)
         language_badges = ", ".join(sorted(repository.languages)) or "source code"
@@ -45,14 +49,17 @@ class GenerationService:
                 ),
             ]
         )
-        return ReportResponse(
+        response = ReportResponse(
             repository_id=repository.id,
             title=f"README Draft: {repository.name}",
             content=content,
             citations=citations,
         )
+        self._record("readme_generation", response, timer.elapsed_ms())
+        return response
 
     def api(self, payload: ApiGenerationRequest) -> ReportResponse:
+        timer = RunTimer()
         repository = self._repository_service.get(payload.repository_id)
         results = self._retriever.search(
             repository,
@@ -85,14 +92,17 @@ class GenerationService:
             ],
             temperature=0.15,
         )
-        return ReportResponse(
+        response = ReportResponse(
             repository_id=repository.id,
             title="API Generation Draft",
             content=content,
             citations=citations,
         )
+        self._record("api_generation", response, timer.elapsed_ms())
+        return response
 
     def unit_test(self, payload: UnitTestGenerationRequest) -> ReportResponse:
+        timer = RunTimer()
         repository = self._repository_service.get(payload.repository_id)
         results = self._retriever.search(repository, payload.target, top_k=6)
         if not results:
@@ -120,12 +130,14 @@ class GenerationService:
             ],
             temperature=0.1,
         )
-        return ReportResponse(
+        response = ReportResponse(
             repository_id=repository.id,
             title="Unit Test Generation Draft",
             content=content,
             citations=citations,
         )
+        self._record("unit_test_generation", response, timer.elapsed_ms())
+        return response
 
     @staticmethod
     def _format_citations(citations: list) -> str:  # noqa: ANN401
@@ -135,4 +147,17 @@ class GenerationService:
             f"文件：{citation.path}:{citation.start_line}-{citation.end_line}\n"
             f"代码片段：\n{citation.preview}"
             for citation in citations
+        )
+
+    def _record(self, kind: str, response: ReportResponse, duration_ms: int) -> None:
+        if self._run_store is None:
+            return
+        self._run_store.record(
+            repository_id=response.repository_id,
+            kind=kind,
+            title=response.title,
+            content=response.content,
+            citations=response.citations,
+            tool_trace=["retriever", "context_builder", "llm"],
+            duration_ms=duration_ms,
         )
