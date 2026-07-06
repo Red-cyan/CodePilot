@@ -1,12 +1,18 @@
 from app.schemas import ReportResponse, ReviewRequest
+from app.services.llm import ChatMessage, LLMClient, default_llm_client
 from app.services.repository import RepositoryService
 from app.services.retriever import CodeRetriever, citation_from_chunk
 
 
 class ReviewService:
-    def __init__(self, repository_service: RepositoryService) -> None:
+    def __init__(
+        self,
+        repository_service: RepositoryService,
+        llm_client: LLMClient | None = None,
+    ) -> None:
         self._repository_service = repository_service
         self._retriever = CodeRetriever()
+        self._llm = llm_client or default_llm_client()
 
     def review(self, payload: ReviewRequest) -> ReportResponse:
         repository = self._repository_service.get(payload.repository_id)
@@ -18,16 +24,27 @@ class ReviewService:
         results = self._retriever.search(repository, changed_terms or payload.diff, top_k=5)
         citations = [citation_from_chunk(chunk, score) for chunk, score in results]
         findings = self._findings(payload.diff)
-        content = (
-            "# Pull Request Review\n\n"
-            "## Findings\n"
-            f"{findings}\n\n"
-            "## Score\n"
-            f"{self._score(payload.diff)}/100\n\n"
-            "## Review Guidance\n"
-            "- Verify behavior changes with focused tests.\n"
-            "- Check cited files for related existing patterns before merging.\n"
-            "- Keep generated or broad formatting changes out of feature diffs.\n"
+        content = self._llm.complete(
+            [
+                ChatMessage(
+                    role="system",
+                    content=(
+                        "你是严格的软件工程代码审查 Agent。请基于 git diff、"
+                        "确定性检查结果和相关仓库代码，用中文输出 PR Review。"
+                        "优先指出 bug、安全、性能、可维护性和测试缺口。"
+                    ),
+                ),
+                ChatMessage(
+                    role="user",
+                    content=(
+                        f"仓库：{repository.name}\n\n"
+                        f"git diff：\n{payload.diff}\n\n"
+                        f"确定性检查：\n{findings}\n\n"
+                        f"初始评分：{self._score(payload.diff)}/100\n\n"
+                        f"相关代码：\n{self._format_citations(citations)}"
+                    ),
+                ),
+            ]
         )
         return ReportResponse(
             repository_id=repository.id,
@@ -66,3 +83,14 @@ class ReviewService:
             if marker.lower() in diff.lower():
                 score -= 8
         return max(score, 50)
+
+    @staticmethod
+    def _format_citations(citations: list) -> str:  # noqa: ANN401
+        if not citations:
+            return "未检索到相关代码片段。"
+        return "\n\n".join(
+            f"文件：{citation.path}:{citation.start_line}-{citation.end_line}\n"
+            f"相关度：{citation.score}\n"
+            f"代码片段：\n{citation.preview}"
+            for citation in citations
+        )
