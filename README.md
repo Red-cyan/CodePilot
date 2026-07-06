@@ -139,6 +139,7 @@ X-CodePilot-Api-Key: your-secret-key
 - [项目状态说明](docs/project-status.md)：汇总已完成能力、验证方式、当前边界和后续路线。
 - [开发规范](docs/development-guide.md)：约束提交、编码、密钥处理和本地验证流程。
 - [架构决策记录](docs/adr/README.md)：解释离线优先、本地持久化和 API Key 等核心取舍。
+- [安全说明](SECURITY.md)：说明密钥、索引数据、API 鉴权和漏洞反馈边界。
 
 1. 调用 `POST /repositories/import` 导入一个代码仓库。
 2. 调用 `POST /repositories/{repository_id}/index` 建立代码索引。
