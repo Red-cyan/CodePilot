@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import create_app
 
 
@@ -51,6 +52,74 @@ def test_import_index_and_chat(tmp_path):
     )
     assert chat.status_code == 200
     assert chat.json()["citations"][0]["path"] == "app.py"
+
+
+def test_api_key_is_optional_when_not_configured(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "api_key", None)
+    (tmp_path / "app.py").write_text("def hello():\n    return 'ok'\n", encoding="utf-8")
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+    )
+
+    assert response.status_code == 200
+
+
+def test_api_key_protects_mutating_and_agent_endpoints(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "api_key", "secret-key")
+    (tmp_path / "app.py").write_text("def hello():\n    return 'ok'\n", encoding="utf-8")
+    client = TestClient(create_app())
+
+    missing = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+    )
+    wrong = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+        headers={"X-CodePilot-Api-Key": "wrong"},
+    )
+    allowed = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+        headers={"X-CodePilot-Api-Key": "secret-key"},
+    )
+
+    assert missing.status_code == 401
+    assert wrong.status_code == 401
+    assert allowed.status_code == 200
+
+    repository_id = allowed.json()["repository"]["id"]
+    blocked_index = client.post(f"/repositories/{repository_id}/index")
+    allowed_index = client.post(
+        f"/repositories/{repository_id}/index",
+        headers={"X-CodePilot-Api-Key": "secret-key"},
+    )
+    blocked_chat = client.post(
+        "/chat",
+        json={"repository_id": repository_id, "question": "hello"},
+    )
+
+    assert blocked_index.status_code == 401
+    assert allowed_index.status_code == 200
+    assert blocked_chat.status_code == 401
+
+
+def test_read_only_endpoints_stay_public_when_api_key_is_configured(monkeypatch):
+    monkeypatch.setattr(settings, "api_key", "secret-key")
+    client = TestClient(create_app())
+
+    health = client.get("/health")
+    diagnostics = client.get("/diagnostics")
+    repositories = client.get("/repositories")
+    runs = client.get("/runs")
+
+    assert health.status_code == 200
+    assert diagnostics.status_code == 200
+    assert repositories.status_code == 200
+    assert runs.status_code == 200
 
 
 def test_repository_browser_endpoints(tmp_path):

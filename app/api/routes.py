@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.security import require_api_key
 from app.schemas import (
     ApiGenerationRequest,
     ArchitectureRequest,
@@ -44,9 +45,15 @@ diagnostics_service = DiagnosticsService(repository_service, run_store)
 analysis_service = AnalysisService(repository_service, run_store=run_store)
 review_service = ReviewService(repository_service, run_store=run_store)
 generation_service = GenerationService(repository_service, run_store=run_store)
+protected = [Depends(require_api_key)]
 
 
-@router.post("/repositories/import", response_model=ImportRepositoryResponse, tags=["repositories"])
+@router.post(
+    "/repositories/import",
+    response_model=ImportRepositoryResponse,
+    tags=["repositories"],
+    dependencies=protected,
+)
 def import_repository(payload: ImportRepositoryRequest) -> ImportRepositoryResponse:
     try:
         return repository_service.import_repository(payload)
@@ -58,6 +65,7 @@ def import_repository(payload: ImportRepositoryRequest) -> ImportRepositoryRespo
     "/repositories/{repository_id}/index",
     response_model=IndexRepositoryResponse,
     tags=["repositories"],
+    dependencies=protected,
 )
 def index_repository(repository_id: str) -> IndexRepositoryResponse:
     try:
@@ -70,6 +78,7 @@ def index_repository(repository_id: str) -> IndexRepositoryResponse:
     "/repositories/{repository_id}/reindex",
     response_model=IndexRepositoryResponse,
     tags=["repositories"],
+    dependencies=protected,
 )
 def reindex_repository(repository_id: str) -> IndexRepositoryResponse:
     try:
@@ -82,6 +91,7 @@ def reindex_repository(repository_id: str) -> IndexRepositoryResponse:
     "/repositories/{repository_id}",
     response_model=DeleteRepositoryResponse,
     tags=["repositories"],
+    dependencies=protected,
 )
 def delete_repository(repository_id: str) -> DeleteRepositoryResponse:
     try:
@@ -158,7 +168,12 @@ def get_run(run_id: str) -> RunRecord:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/search/code", response_model=CodeSearchResponse, tags=["search"])
+@router.post(
+    "/search/code",
+    response_model=CodeSearchResponse,
+    tags=["search"],
+    dependencies=protected,
+)
 def search_code(payload: CodeSearchRequest) -> CodeSearchResponse:
     try:
         return search_service.search(payload)
@@ -166,7 +181,7 @@ def search_code(payload: CodeSearchRequest) -> CodeSearchResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/chat", response_model=ChatResponse, tags=["agents"])
+@router.post("/chat", response_model=ChatResponse, tags=["agents"], dependencies=protected)
 def chat(payload: ChatRequest) -> ChatResponse:
     try:
         return analysis_service.chat(payload)
@@ -174,7 +189,12 @@ def chat(payload: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/analyze/architecture", response_model=ReportResponse, tags=["agents"])
+@router.post(
+    "/analyze/architecture",
+    response_model=ReportResponse,
+    tags=["agents"],
+    dependencies=protected,
+)
 def analyze_architecture(payload: ArchitectureRequest) -> ReportResponse:
     try:
         return analysis_service.architecture(payload.repository_id)
@@ -182,7 +202,7 @@ def analyze_architecture(payload: ArchitectureRequest) -> ReportResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/analyze/bug", response_model=ReportResponse, tags=["agents"])
+@router.post("/analyze/bug", response_model=ReportResponse, tags=["agents"], dependencies=protected)
 def analyze_bug(payload: BugAnalysisRequest) -> ReportResponse:
     try:
         return analysis_service.bug(payload)
@@ -190,7 +210,7 @@ def analyze_bug(payload: BugAnalysisRequest) -> ReportResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/review", response_model=ReviewResponse, tags=["agents"])
+@router.post("/review", response_model=ReviewResponse, tags=["agents"], dependencies=protected)
 def review(payload: ReviewRequest) -> ReviewResponse:
     try:
         return review_service.review(payload)
@@ -198,7 +218,12 @@ def review(payload: ReviewRequest) -> ReviewResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/generate/readme", response_model=ReportResponse, tags=["agents"])
+@router.post(
+    "/generate/readme",
+    response_model=ReportResponse,
+    tags=["agents"],
+    dependencies=protected,
+)
 def generate_readme(payload: ReadmeRequest) -> ReportResponse:
     try:
         return generation_service.readme(payload.repository_id)
@@ -206,7 +231,12 @@ def generate_readme(payload: ReadmeRequest) -> ReportResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/generate/api", response_model=ReportResponse, tags=["agents"])
+@router.post(
+    "/generate/api",
+    response_model=ReportResponse,
+    tags=["agents"],
+    dependencies=protected,
+)
 def generate_api(payload: ApiGenerationRequest) -> ReportResponse:
     try:
         return generation_service.api(payload)
@@ -214,7 +244,12 @@ def generate_api(payload: ApiGenerationRequest) -> ReportResponse:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/generate/test", response_model=ReportResponse, tags=["agents"])
+@router.post(
+    "/generate/test",
+    response_model=ReportResponse,
+    tags=["agents"],
+    dependencies=protected,
+)
 def generate_unit_test(payload: UnitTestGenerationRequest) -> ReportResponse:
     try:
         return generation_service.unit_test(payload)
