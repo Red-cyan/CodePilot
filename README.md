@@ -136,6 +136,8 @@ X-CodePilot-Api-Key: your-secret-key
 - [演示脚本](docs/demo-script.md)：按接口顺序完成一次完整演示。
 - [演示检查清单](docs/demo-checklist.md)：面试前检查环境、请求头、接口顺序和常见问题。
 - [面试讲解指南](docs/interview-guide.md)：整理项目讲法、技术难点、边界和常见追问。
+- [面试追问速查](docs/interview-qa.md)：整理高频追问和短回答。
+- [简历写法](docs/resume-guide.md)：提供项目经历、STAR 讲法和可量化表达。
 - [项目状态说明](docs/project-status.md)：汇总已完成能力、验证方式、当前边界和后续路线。
 - [开发规范](docs/development-guide.md)：约束提交、编码、密钥处理和本地验证流程。
 - [架构决策记录](docs/adr/README.md)：解释离线优先、本地持久化和 API Key 等核心取舍。
