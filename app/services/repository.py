@@ -11,11 +11,13 @@ from app.schemas import (
     RepositorySummary,
 )
 from app.services.models import RepositoryState
+from app.services.state_store import RepositoryStateStore
 
 
 class RepositoryService:
-    def __init__(self) -> None:
-        self._repositories: dict[str, RepositoryState] = {}
+    def __init__(self, state_store: RepositoryStateStore | None = None) -> None:
+        self._state_store = state_store or RepositoryStateStore()
+        self._repositories: dict[str, RepositoryState] = self._state_store.load()
 
     def import_repository(self, payload: ImportRepositoryRequest) -> ImportRepositoryResponse:
         path = self._resolve_source(payload)
@@ -28,6 +30,7 @@ class RepositoryService:
             commit_hash=self._current_commit(path),
         )
         self._repositories[repository_id] = state
+        self.save()
         return ImportRepositoryResponse(repository=self._summary(state))
 
     def list_repositories(self) -> list[RepositorySummary]:
@@ -37,6 +40,9 @@ class RepositoryService:
         if repository_id not in self._repositories:
             raise KeyError(f"Repository {repository_id} was not found.")
         return self._repositories[repository_id]
+
+    def save(self) -> None:
+        self._state_store.save(self._repositories)
 
     def _resolve_source(self, payload: ImportRepositoryRequest) -> Path:
         if payload.mode == ImportMode.local:

@@ -21,6 +21,7 @@ class IndexerService:
         state.languages = languages
         state.files_indexed = sum(languages.values())
         state.chunks_indexed = len(chunks)
+        self._repository_service.save()
         return IndexRepositoryResponse(
             repository_id=repository_id,
             files_indexed=state.files_indexed,
