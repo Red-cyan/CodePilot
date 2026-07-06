@@ -105,6 +105,9 @@ class IndexRepositoryResponse(BaseModel):
     files_indexed: int
     chunks_indexed: int
     symbols_indexed: int
+    files_scanned: int = 0
+    skipped_files: int = 0
+    skip_reasons: dict[str, int] = Field(default_factory=dict)
 
 
 class ChatRequest(BaseModel):

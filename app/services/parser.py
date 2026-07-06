@@ -1,7 +1,9 @@
 import ast
 import hashlib
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from app.services.index_policy import IndexPolicy
 from app.services.models import CodeChunk, Symbol
 
 LANGUAGE_BY_SUFFIX = {
@@ -33,23 +35,51 @@ IGNORED_DIRS = {
 }
 
 
+@dataclass(slots=True)
+class ParseResult:
+    chunks: list[CodeChunk]
+    symbols: list[Symbol]
+    languages: dict[str, int]
+    files_scanned: int = 0
+    skipped_files: int = 0
+    skip_reasons: dict[str, int] = field(default_factory=dict)
+
+
 class RepositoryParser:
+    def __init__(self, policy: IndexPolicy | None = None) -> None:
+        self._policy = policy or IndexPolicy.from_settings()
+
     def scan(
         self,
         repository_id: str,
         root: Path,
-    ) -> tuple[list[CodeChunk], list[Symbol], dict[str, int]]:
+    ) -> ParseResult:
         chunks: list[CodeChunk] = []
         symbols: list[Symbol] = []
         languages: dict[str, int] = {}
+        files_scanned = 0
+        skipped_files = 0
+        skip_reasons: dict[str, int] = {}
         for path in sorted(root.rglob("*")):
-            if not path.is_file() or self._is_ignored(path, root):
+            if not path.is_file():
+                continue
+            files_scanned += 1
+            reason = self._policy.skip_reason(path, root)
+            if reason is not None:
+                skipped_files += 1
+                skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
                 continue
             language = LANGUAGE_BY_SUFFIX.get(path.suffix.lower())
             if language is None:
+                skipped_files += 1
+                skip_reasons["unsupported_extension"] = (
+                    skip_reasons.get("unsupported_extension", 0) + 1
+                )
                 continue
-            text = self._read_text(path)
-            if not text:
+            text, reason = self._read_text(path)
+            if reason is not None:
+                skipped_files += 1
+                skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
                 continue
             relative_path = path.relative_to(root).as_posix()
             file_symbols = self._extract_symbols(relative_path, language, text)
@@ -63,21 +93,24 @@ class RepositoryParser:
             )
             chunks.extend(file_chunks)
             languages[language] = languages.get(language, 0) + 1
-        return chunks, symbols, languages
+        return ParseResult(
+            chunks=chunks,
+            symbols=symbols,
+            languages=languages,
+            files_scanned=files_scanned,
+            skipped_files=skipped_files,
+            skip_reasons=skip_reasons,
+        )
 
     @staticmethod
-    def _is_ignored(path: Path, root: Path) -> bool:
-        relative_parts = path.relative_to(root).parts
-        return any(part in IGNORED_DIRS for part in relative_parts)
-
-    @staticmethod
-    def _read_text(path: Path) -> str:
+    def _read_text(path: Path) -> tuple[str, str | None]:
         try:
-            if path.stat().st_size > 512_000:
-                return ""
-            return path.read_text(encoding="utf-8")
+            text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            return ""
+            return "", "non_utf8"
+        if not text:
+            return "", "empty_file"
+        return text, None
 
     @staticmethod
     def _extract_symbols(path: str, language: str, text: str) -> list[Symbol]:

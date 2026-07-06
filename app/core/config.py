@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     storage_dir: Path = Path("storage")
     database_url: str = "postgresql+psycopg://codepilot:codepilot@localhost:5432/codepilot"
     redis_url: str = "redis://localhost:6379/0"
+    max_index_file_size: int = 512_000
+    ignored_dirs: str = (
+        ".git,.idea,.venv,__pycache__,node_modules,dist,build,target,"
+        ".pytest_cache,.ruff_cache"
+    )
     deepseek_api_key: str | None = Field(default=None, validation_alias="DEEPSEEK_API_KEY")
     deepseek_base_url: str = Field(
         default="https://api.deepseek.com",

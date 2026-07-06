@@ -12,19 +12,22 @@ class IndexerService:
 
     def index_repository(self, repository_id: str) -> IndexRepositoryResponse:
         state = self._repository_service.get(repository_id)
-        chunks, symbols, languages = self._parser.scan(repository_id, state.path)
-        for chunk in chunks:
+        result = self._parser.scan(repository_id, state.path)
+        for chunk in result.chunks:
             symbol_text = " ".join(symbol.name for symbol in chunk.symbols)
             chunk.vector = self._embedding.embed(f"{chunk.path}\n{symbol_text}\n{chunk.text}")
-        state.chunks = chunks
-        state.symbols = symbols
-        state.languages = languages
-        state.files_indexed = sum(languages.values())
-        state.chunks_indexed = len(chunks)
+        state.chunks = result.chunks
+        state.symbols = result.symbols
+        state.languages = result.languages
+        state.files_indexed = sum(result.languages.values())
+        state.chunks_indexed = len(result.chunks)
         self._repository_service.save()
         return IndexRepositoryResponse(
             repository_id=repository_id,
             files_indexed=state.files_indexed,
             chunks_indexed=state.chunks_indexed,
-            symbols_indexed=len(symbols),
+            symbols_indexed=len(result.symbols),
+            files_scanned=result.files_scanned,
+            skipped_files=result.skipped_files,
+            skip_reasons=result.skip_reasons,
         )

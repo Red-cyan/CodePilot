@@ -13,6 +13,7 @@ def test_health():
 
 
 def test_import_index_and_chat(tmp_path):
+    (tmp_path / "notes.txt").write_text("not source", encoding="utf-8")
     (tmp_path / "app.py").write_text(
         "class RepositoryService:\n    def import_repository(self):\n        return 'ok'\n",
         encoding="utf-8",
@@ -29,6 +30,9 @@ def test_import_index_and_chat(tmp_path):
     indexed = client.post(f"/repositories/{repository_id}/index")
     assert indexed.status_code == 200
     assert indexed.json()["files_indexed"] == 1
+    assert indexed.json()["files_scanned"] == 2
+    assert indexed.json()["skipped_files"] == 1
+    assert indexed.json()["skip_reasons"]["unsupported_extension"] == 1
 
     chat = client.post(
         "/chat",
