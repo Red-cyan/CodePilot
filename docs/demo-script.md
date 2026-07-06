@@ -36,6 +36,15 @@ http://127.0.0.1:8000/docs
 - `files_indexed`
 - `chunks_indexed`
 - `symbols_indexed`
+- `files_scanned`
+- `skipped_files`
+- `skip_reasons`
+
+演示重点：
+
+- `CODEPILOT_MAX_INDEX_FILE_SIZE` 控制单文件最大索引大小。
+- `CODEPILOT_IGNORED_DIRS` 控制忽略目录，例如 `.git`、`node_modules`、`.venv`。
+- `skip_reasons` 可以解释文件为什么没有进入索引，例如 `ignored_directory`、`unsupported_extension`、`empty_file`、`file_too_large`。
 
 如果源码发生变化，调用 `POST /repositories/{repository_id}/reindex` 重新扫描并刷新索引。
 
@@ -197,5 +206,5 @@ PR Review 示例：
 ## 10. 面试讲解重点
 
 - CodePilot 不是普通聊天机器人，而是围绕代码仓库理解设计的工程 Agent。
-- 当前闭环包括导入、解析、源码浏览、多模式检索、索引、LLM 生成、运行历史、系统诊断、引用追踪和测试验证。
+- 当前闭环包括导入、解析、可解释索引、源码浏览、多模式检索、LLM 生成、运行历史、系统诊断、引用追踪和测试验证。
 - 测试环境禁用真实模型调用，保证 CI 稳定；本地 `.env` 配置 API Key 后可调用真实 DeepSeek。
