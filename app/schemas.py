@@ -25,6 +25,38 @@ class RepositorySummary(BaseModel):
     languages: dict[str, int] = Field(default_factory=dict)
 
 
+class RepositoryStats(BaseModel):
+    repository_count: int
+    files_indexed: int
+    chunks_indexed: int
+    symbols_indexed: int
+    languages: dict[str, int] = Field(default_factory=dict)
+
+
+class LLMStatus(BaseModel):
+    provider: str
+    model: str
+    configured: bool
+    base_url: str
+
+
+class StorageStatus(BaseModel):
+    storage_dir: str
+    repository_state_file: str
+    run_state_file: str
+    repository_state_exists: bool
+    run_state_exists: bool
+
+
+class DiagnosticsResponse(BaseModel):
+    status: str
+    environment: str
+    repositories: RepositoryStats
+    run_count: int
+    llm: LLMStatus
+    storage: StorageStatus
+
+
 class FileTreeItem(BaseModel):
     path: str
     name: str

@@ -117,6 +117,32 @@ def test_code_search_endpoint_supports_multiple_modes(tmp_path):
     assert symbol.json()["hits"][0]["kind"] == "class"
 
 
+def test_diagnostics_reports_index_and_model_status(tmp_path):
+    (tmp_path / "service.py").write_text(
+        "def handle_request():\n    return 'ok'\n",
+        encoding="utf-8",
+    )
+    client = TestClient(create_app())
+
+    imported = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+    )
+    repository_id = imported.json()["repository"]["id"]
+    client.post(f"/repositories/{repository_id}/index")
+
+    response = client.get("/diagnostics")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["repositories"]["repository_count"] >= 1
+    assert payload["repositories"]["files_indexed"] >= 1
+    assert payload["repositories"]["chunks_indexed"] >= 1
+    assert "api_key" not in payload["llm"]
+    assert payload["llm"]["configured"] is False
+
+
 def test_generation_endpoints(tmp_path):
     (tmp_path / "service.py").write_text(
         "def create_order(user_id: str):\n    return {'user_id': user_id}\n",

@@ -36,6 +36,9 @@ class RepositoryService:
     def list_repositories(self) -> list[RepositorySummary]:
         return [self._summary(repo) for repo in self._repositories.values()]
 
+    def states(self) -> list[RepositoryState]:
+        return list(self._repositories.values())
+
     def get(self, repository_id: str) -> RepositoryState:
         if repository_id not in self._repositories:
             raise KeyError(f"Repository {repository_id} was not found.")

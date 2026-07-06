@@ -8,6 +8,7 @@ from app.schemas import (
     ChatResponse,
     CodeSearchRequest,
     CodeSearchResponse,
+    DiagnosticsResponse,
     FileContentResponse,
     FileTreeResponse,
     ImportRepositoryRequest,
@@ -24,6 +25,7 @@ from app.schemas import (
 )
 from app.services.analysis import AnalysisService
 from app.services.browser import BrowserService
+from app.services.diagnostics import DiagnosticsService
 from app.services.generation import GenerationService
 from app.services.indexer import IndexerService
 from app.services.repository import RepositoryService
@@ -37,6 +39,7 @@ indexer_service = IndexerService(repository_service)
 browser_service = BrowserService(repository_service)
 search_service = CodeSearchService(repository_service)
 run_store = RunStore()
+diagnostics_service = DiagnosticsService(repository_service, run_store)
 analysis_service = AnalysisService(repository_service, run_store=run_store)
 review_service = ReviewService(repository_service, run_store=run_store)
 generation_service = GenerationService(repository_service, run_store=run_store)
@@ -65,6 +68,11 @@ def index_repository(repository_id: str) -> IndexRepositoryResponse:
 @router.get("/repositories", tags=["repositories"])
 def list_repositories() -> list[dict[str, object]]:
     return [repo.model_dump() for repo in repository_service.list_repositories()]
+
+
+@router.get("/diagnostics", response_model=DiagnosticsResponse, tags=["system"])
+def diagnostics() -> DiagnosticsResponse:
+    return diagnostics_service.summary()
 
 
 @router.get(
