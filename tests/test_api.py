@@ -10,6 +10,17 @@ def test_health():
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+    assert response.headers["X-Request-Id"]
+    assert int(response.headers["X-Process-Time-Ms"]) >= 0
+
+
+def test_request_id_header_is_preserved():
+    client = TestClient(create_app())
+
+    response = client.get("/health", headers={"X-Request-Id": "interview-demo"})
+
+    assert response.status_code == 200
+    assert response.headers["X-Request-Id"] == "interview-demo"
 
 
 def test_import_index_and_chat(tmp_path):
