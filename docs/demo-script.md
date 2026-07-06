@@ -1,17 +1,22 @@
-# CodePilot Demo Script
+# CodePilot 演示脚本
 
-## 1. Start the API
+## 1. 启动 API
 
 ```powershell
 uv sync --group dev
+Copy-Item .env.example .env
 uv run uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs`.
+打开：
 
-## 2. Import a Repository
+```text
+http://127.0.0.1:8000/docs
+```
 
-Call `POST /repositories/import`:
+## 2. 导入仓库
+
+调用 `POST /repositories/import`：
 
 ```json
 {
@@ -20,35 +25,88 @@ Call `POST /repositories/import`:
 }
 ```
 
-## 3. Index the Repository
+保存返回结果中的 `repository.id`。
 
-Call `POST /repositories/{repository_id}/index`.
+## 3. 建立索引
 
-Expected result:
+调用 `POST /repositories/{repository_id}/index`。
 
-- indexed file count
-- indexed chunk count
-- indexed symbol count
+重点观察返回值：
 
-## 4. Ask a Code Question
+- `files_indexed`
+- `chunks_indexed`
+- `symbols_indexed`
 
-Call `POST /chat`:
+## 4. 仓库问答
+
+调用 `POST /chat`：
 
 ```json
 {
   "repository_id": "<id>",
-  "question": "How does repository import work?",
+  "question": "这个项目的仓库导入逻辑是怎么实现的？",
   "top_k": 5
 }
 ```
 
-The response should include cited files and line ranges.
+演示重点：
 
-## 5. Run Agent Reports
+- 回答由 DeepSeek Chat 生成。
+- 返回结果包含引用文件、行号和代码片段。
+- 未配置模型时会自动回退，不影响流程演示。
+
+## 5. 分析类 Agent
+
+依次调用：
 
 - `POST /analyze/architecture`
 - `POST /analyze/bug`
 - `POST /review`
-- `POST /generate/readme`
 
-Use these outputs to explain repository understanding, RAG retrieval, and software engineering workflows in interviews.
+Bug 分析示例：
+
+```json
+{
+  "repository_id": "<id>",
+  "error_log": "ModuleNotFoundError: No module named 'app'"
+}
+```
+
+PR Review 示例：
+
+```json
+{
+  "repository_id": "<id>",
+  "diff": "+ print('debug')\n+ password = '123456'"
+}
+```
+
+## 6. 生成类 Agent
+
+调用 `POST /generate/readme` 生成 README 草稿。
+
+调用 `POST /generate/api`：
+
+```json
+{
+  "repository_id": "<id>",
+  "requirement": "新增一个导出仓库架构报告的接口",
+  "style": "FastAPI + service + schema + pytest"
+}
+```
+
+调用 `POST /generate/test`：
+
+```json
+{
+  "repository_id": "<id>",
+  "target": "RepositoryService.import_repository",
+  "framework": "pytest"
+}
+```
+
+## 7. 面试讲解重点
+
+- CodePilot 不是普通聊天机器人，而是围绕代码仓库理解设计的工程 Agent。
+- 当前闭环包括导入、解析、索引、检索、LLM 生成、引用追踪和测试验证。
+- 测试环境禁用真实模型调用，保证 CI 稳定；本地 `.env` 配置 API Key 后可调用真实 DeepSeek。
