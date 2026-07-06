@@ -37,6 +37,10 @@ http://127.0.0.1:8000/docs
 - `chunks_indexed`
 - `symbols_indexed`
 
+如果源码发生变化，调用 `POST /repositories/{repository_id}/reindex` 重新扫描并刷新索引。
+
+如果需要清理演示环境，调用 `DELETE /repositories/{repository_id}` 删除 CodePilot 内部记录和索引状态。该接口不会删除磁盘上的源码目录。
+
 ## 4. 源码浏览
 
 先调用源码浏览接口，确认系统已经理解仓库结构：
