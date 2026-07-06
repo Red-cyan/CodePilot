@@ -8,6 +8,7 @@ from app.schemas import (
     ChatResponse,
     CodeSearchRequest,
     CodeSearchResponse,
+    DeleteRepositoryResponse,
     DiagnosticsResponse,
     FileContentResponse,
     FileTreeResponse,
@@ -63,6 +64,35 @@ def index_repository(repository_id: str) -> IndexRepositoryResponse:
         return indexer_service.index_repository(repository_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post(
+    "/repositories/{repository_id}/reindex",
+    response_model=IndexRepositoryResponse,
+    tags=["repositories"],
+)
+def reindex_repository(repository_id: str) -> IndexRepositoryResponse:
+    try:
+        return indexer_service.index_repository(repository_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete(
+    "/repositories/{repository_id}",
+    response_model=DeleteRepositoryResponse,
+    tags=["repositories"],
+)
+def delete_repository(repository_id: str) -> DeleteRepositoryResponse:
+    try:
+        repository_service.delete(repository_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return DeleteRepositoryResponse(
+        repository_id=repository_id,
+        deleted=True,
+        message="已删除 CodePilot 中的仓库记录和索引状态，未删除磁盘源码目录。",
+    )
 
 
 @router.get("/repositories", tags=["repositories"])

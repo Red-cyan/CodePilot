@@ -143,6 +143,38 @@ def test_diagnostics_reports_index_and_model_status(tmp_path):
     assert payload["llm"]["configured"] is False
 
 
+def test_reindex_and_delete_repository(tmp_path):
+    (tmp_path / "first.py").write_text(
+        "def first():\n    return 'first'\n",
+        encoding="utf-8",
+    )
+    client = TestClient(create_app())
+
+    imported = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+    )
+    repository_id = imported.json()["repository"]["id"]
+    indexed = client.post(f"/repositories/{repository_id}/index")
+    assert indexed.status_code == 200
+    assert indexed.json()["files_indexed"] == 1
+
+    (tmp_path / "second.py").write_text(
+        "def second():\n    return 'second'\n",
+        encoding="utf-8",
+    )
+    reindexed = client.post(f"/repositories/{repository_id}/reindex")
+    assert reindexed.status_code == 200
+    assert reindexed.json()["files_indexed"] == 2
+
+    deleted = client.delete(f"/repositories/{repository_id}")
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"] is True
+
+    missing = client.post(f"/repositories/{repository_id}/reindex")
+    assert missing.status_code == 404
+
+
 def test_generation_endpoints(tmp_path):
     (tmp_path / "service.py").write_text(
         "def create_order(user_id: str):\n    return {'user_id': user_id}\n",

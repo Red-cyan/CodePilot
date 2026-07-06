@@ -94,6 +94,12 @@ class ImportRepositoryResponse(BaseModel):
     repository: RepositorySummary
 
 
+class DeleteRepositoryResponse(BaseModel):
+    repository_id: str
+    deleted: bool
+    message: str
+
+
 class IndexRepositoryResponse(BaseModel):
     repository_id: str
     files_indexed: int

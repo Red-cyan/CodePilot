@@ -44,6 +44,12 @@ class RepositoryService:
             raise KeyError(f"Repository {repository_id} was not found.")
         return self._repositories[repository_id]
 
+    def delete(self, repository_id: str) -> None:
+        if repository_id not in self._repositories:
+            raise KeyError(f"Repository {repository_id} was not found.")
+        del self._repositories[repository_id]
+        self.save()
+
     def save(self) -> None:
         self._state_store.save(self._repositories)
 
