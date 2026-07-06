@@ -39,6 +39,19 @@ http://127.0.0.1:8000/docs
 
 ## 4. 仓库问答
 
+先调用源码浏览接口，确认系统已经理解仓库结构：
+
+- `GET /repositories/{repository_id}/tree`
+- `GET /repositories/{repository_id}/files?path=app/services/repository.py`
+- `GET /repositories/{repository_id}/symbols`
+
+演示重点：
+
+- 文件读取接口会限制路径必须在仓库根目录内，避免任意文件读取。
+- 符号列表来自索引阶段解析出的 class、function 和 import。
+
+## 5. 仓库问答
+
 调用 `POST /chat`：
 
 ```json
@@ -55,7 +68,7 @@ http://127.0.0.1:8000/docs
 - 返回结果包含引用文件、行号和代码片段。
 - 未配置模型时会自动回退，不影响流程演示。
 
-## 5. 分析类 Agent
+## 6. 分析类 Agent
 
 依次调用：
 
@@ -81,7 +94,7 @@ PR Review 示例：
 }
 ```
 
-## 6. 生成类 Agent
+## 7. 生成类 Agent
 
 调用 `POST /generate/readme` 生成 README 草稿。
 
@@ -105,9 +118,7 @@ PR Review 示例：
 }
 ```
 
-## 7. 面试讲解重点
-
-## 7. 查看运行历史
+## 8. 查看运行历史
 
 调用 `GET /runs?repository_id=<id>` 查看当前仓库的 Agent 调用历史。
 
@@ -120,8 +131,8 @@ PR Review 示例：
 - 每条记录保留 citations，能展示回答依据来自哪些文件和行号。
 - 每条记录包含 `duration_ms`，可以体现基本可观测性。
 
-## 8. 面试讲解重点
+## 9. 面试讲解重点
 
 - CodePilot 不是普通聊天机器人，而是围绕代码仓库理解设计的工程 Agent。
-- 当前闭环包括导入、解析、索引、检索、LLM 生成、运行历史、引用追踪和测试验证。
+- 当前闭环包括导入、解析、源码浏览、索引、检索、LLM 生成、运行历史、引用追踪和测试验证。
 - 测试环境禁用真实模型调用，保证 CI 稳定；本地 `.env` 配置 API Key 后可调用真实 DeepSeek。
