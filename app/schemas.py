@@ -60,6 +60,21 @@ class ReadmeRequest(BaseModel):
     repository_id: str
 
 
+class ApiGenerationRequest(BaseModel):
+    repository_id: str
+    requirement: str = Field(..., description="API feature requirement to generate.")
+    style: str = Field(
+        default="FastAPI + service + schema + pytest",
+        description="Preferred implementation style or framework conventions.",
+    )
+
+
+class UnitTestGenerationRequest(BaseModel):
+    repository_id: str
+    target: str = Field(..., description="File path, symbol name, or behavior to test.")
+    framework: str = Field(default="pytest", description="Preferred test framework.")
+
+
 class Citation(BaseModel):
     path: str
     start_line: int

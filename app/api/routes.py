@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.schemas import (
+    ApiGenerationRequest,
     ArchitectureRequest,
     BugAnalysisRequest,
     ChatRequest,
@@ -10,6 +11,7 @@ from app.schemas import (
     ReadmeRequest,
     ReportResponse,
     ReviewRequest,
+    UnitTestGenerationRequest,
 )
 from app.services.analysis import AnalysisService
 from app.services.generation import GenerationService
@@ -86,5 +88,21 @@ def review(payload: ReviewRequest) -> ReportResponse:
 def generate_readme(payload: ReadmeRequest) -> ReportResponse:
     try:
         return generation_service.readme(payload.repository_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/generate/api", response_model=ReportResponse, tags=["agents"])
+def generate_api(payload: ApiGenerationRequest) -> ReportResponse:
+    try:
+        return generation_service.api(payload)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/generate/test", response_model=ReportResponse, tags=["agents"])
+def generate_unit_test(payload: UnitTestGenerationRequest) -> ReportResponse:
+    try:
+        return generation_service.unit_test(payload)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

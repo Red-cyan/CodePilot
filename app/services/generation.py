@@ -1,9 +1,9 @@
 from collections import Counter
 
-from app.schemas import ReportResponse
+from app.schemas import ApiGenerationRequest, ReportResponse, UnitTestGenerationRequest
 from app.services.llm import ChatMessage, LLMClient, default_llm_client
 from app.services.repository import RepositoryService
-from app.services.retriever import citation_from_chunk
+from app.services.retriever import CodeRetriever, citation_from_chunk
 
 
 class GenerationService:
@@ -14,6 +14,7 @@ class GenerationService:
     ) -> None:
         self._repository_service = repository_service
         self._llm = llm_client or default_llm_client()
+        self._retriever = CodeRetriever()
 
     def readme(self, repository_id: str) -> ReportResponse:
         repository = self._repository_service.get(repository_id)
@@ -47,6 +48,81 @@ class GenerationService:
         return ReportResponse(
             repository_id=repository.id,
             title=f"README Draft: {repository.name}",
+            content=content,
+            citations=citations,
+        )
+
+    def api(self, payload: ApiGenerationRequest) -> ReportResponse:
+        repository = self._repository_service.get(payload.repository_id)
+        results = self._retriever.search(
+            repository,
+            f"{payload.requirement} {payload.style}",
+            top_k=6,
+        )
+        if not results:
+            results = [(chunk, 0.0) for chunk in repository.chunks[:6]]
+        citations = [citation_from_chunk(chunk, score) for chunk, score in results]
+        content = self._llm.complete(
+            [
+                ChatMessage(
+                    role="system",
+                    content=(
+                        "你是资深后端工程师。请基于现有仓库代码风格和用户需求，"
+                        "生成 API 实现方案。输出中文 Markdown，必须包含："
+                        "接口设计、建议修改文件、核心代码草稿、错误处理、测试建议。"
+                        "不要声称已经修改文件，只输出可供开发者应用的草稿。"
+                    ),
+                ),
+                ChatMessage(
+                    role="user",
+                    content=(
+                        f"仓库：{repository.name}\n"
+                        f"需求：{payload.requirement}\n"
+                        f"偏好风格：{payload.style}\n\n"
+                        f"相关代码上下文：\n{self._format_citations(citations)}"
+                    ),
+                ),
+            ],
+            temperature=0.15,
+        )
+        return ReportResponse(
+            repository_id=repository.id,
+            title="API Generation Draft",
+            content=content,
+            citations=citations,
+        )
+
+    def unit_test(self, payload: UnitTestGenerationRequest) -> ReportResponse:
+        repository = self._repository_service.get(payload.repository_id)
+        results = self._retriever.search(repository, payload.target, top_k=6)
+        if not results:
+            results = [(chunk, 0.0) for chunk in repository.chunks[:6]]
+        citations = [citation_from_chunk(chunk, score) for chunk, score in results]
+        content = self._llm.complete(
+            [
+                ChatMessage(
+                    role="system",
+                    content=(
+                        "你是测试工程师。请基于目标代码和仓库上下文生成单元测试草稿。"
+                        "输出中文 Markdown，必须包含：测试文件路径建议、测试用例列表、"
+                        "mock 策略、完整测试代码、运行命令。"
+                    ),
+                ),
+                ChatMessage(
+                    role="user",
+                    content=(
+                        f"仓库：{repository.name}\n"
+                        f"测试目标：{payload.target}\n"
+                        f"测试框架：{payload.framework}\n\n"
+                        f"相关代码上下文：\n{self._format_citations(citations)}"
+                    ),
+                ),
+            ],
+            temperature=0.1,
+        )
+        return ReportResponse(
+            repository_id=repository.id,
+            title="Unit Test Generation Draft",
             content=content,
             citations=citations,
         )
