@@ -2,10 +2,19 @@
 
 ## 1. 启动 API
 
+本地开发启动：
+
 ```powershell
 uv sync --group dev
 Copy-Item .env.example .env
 uv run uvicorn app.main:app --reload
+```
+
+容器化启动完整后端环境：
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
 ```
 
 打开：
@@ -13,6 +22,11 @@ uv run uvicorn app.main:app --reload
 ```text
 http://127.0.0.1:8000/docs
 ```
+
+演示重点：
+
+- Docker Compose 会启动 API、PostgreSQL/pgvector 和 Redis。
+- API 容器使用 Docker volume 保存 `storage` 状态，不会污染仓库目录。
 
 ## 2. 导入仓库
 
