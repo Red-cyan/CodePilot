@@ -108,6 +108,36 @@ class UnitTestGenerationRequest(BaseModel):
     framework: str = Field(default="pytest", description="Preferred test framework.")
 
 
+class SearchMode(StrEnum):
+    semantic = "semantic"
+    keyword = "keyword"
+    symbol = "symbol"
+
+
+class CodeSearchRequest(BaseModel):
+    repository_id: str
+    query: str
+    mode: SearchMode = SearchMode.semantic
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+class CodeSearchHit(BaseModel):
+    path: str
+    start_line: int
+    end_line: int
+    score: float
+    language: str | None = None
+    kind: str
+    preview: str
+
+
+class CodeSearchResponse(BaseModel):
+    repository_id: str
+    query: str
+    mode: SearchMode
+    hits: list[CodeSearchHit]
+
+
 class Citation(BaseModel):
     path: str
     start_line: int

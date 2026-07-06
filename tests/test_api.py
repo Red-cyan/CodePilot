@@ -79,6 +79,44 @@ def test_repository_browser_endpoints(tmp_path):
     assert unsafe.status_code == 400
 
 
+def test_code_search_endpoint_supports_multiple_modes(tmp_path):
+    (tmp_path / "search_service.py").write_text(
+        "class SearchService:\n"
+        "    def find_user(self, user_id: str):\n"
+        "        return {'user_id': user_id}\n",
+        encoding="utf-8",
+    )
+    client = TestClient(create_app())
+
+    imported = client.post(
+        "/repositories/import",
+        json={"mode": "local", "source": str(tmp_path)},
+    )
+    repository_id = imported.json()["repository"]["id"]
+    client.post(f"/repositories/{repository_id}/index")
+
+    semantic = client.post(
+        "/search/code",
+        json={"repository_id": repository_id, "query": "find user", "mode": "semantic"},
+    )
+    assert semantic.status_code == 200
+    assert semantic.json()["hits"][0]["path"] == "search_service.py"
+
+    keyword = client.post(
+        "/search/code",
+        json={"repository_id": repository_id, "query": "user_id", "mode": "keyword"},
+    )
+    assert keyword.status_code == 200
+    assert keyword.json()["hits"][0]["kind"] == "chunk"
+
+    symbol = client.post(
+        "/search/code",
+        json={"repository_id": repository_id, "query": "SearchService", "mode": "symbol"},
+    )
+    assert symbol.status_code == 200
+    assert symbol.json()["hits"][0]["kind"] == "class"
+
+
 def test_generation_endpoints(tmp_path):
     (tmp_path / "service.py").write_text(
         "def create_order(user_id: str):\n    return {'user_id': user_id}\n",

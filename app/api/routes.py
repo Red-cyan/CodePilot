@@ -6,6 +6,8 @@ from app.schemas import (
     BugAnalysisRequest,
     ChatRequest,
     ChatResponse,
+    CodeSearchRequest,
+    CodeSearchResponse,
     FileContentResponse,
     FileTreeResponse,
     ImportRepositoryRequest,
@@ -26,11 +28,13 @@ from app.services.indexer import IndexerService
 from app.services.repository import RepositoryService
 from app.services.review import ReviewService
 from app.services.run_store import RunStore
+from app.services.search import CodeSearchService
 
 router = APIRouter()
 repository_service = RepositoryService()
 indexer_service = IndexerService(repository_service)
 browser_service = BrowserService(repository_service)
+search_service = CodeSearchService(repository_service)
 run_store = RunStore()
 analysis_service = AnalysisService(repository_service, run_store=run_store)
 review_service = ReviewService(repository_service, run_store=run_store)
@@ -111,6 +115,14 @@ def list_runs(repository_id: str | None = None) -> RunListResponse:
 def get_run(run_id: str) -> RunRecord:
     try:
         return run_store.get(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/search/code", response_model=CodeSearchResponse, tags=["search"])
+def search_code(payload: CodeSearchRequest) -> CodeSearchResponse:
+    try:
+        return search_service.search(payload)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
